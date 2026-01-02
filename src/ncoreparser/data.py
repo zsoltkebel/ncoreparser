@@ -45,6 +45,10 @@ class SearchParamType(Enum):
     XXX_DVD = "xxx_dvd"
     XXX_HD = "xxx_hd"
     ALL_OWN = "all_own"
+    ALL = "all"
+    SELECTED = "kivalasztottak_kozott"
+    LEGAL = "legal"
+    ORIGINAL_RELEASE = "eredeti_releasekben"
 
 
 def get_detailed_param(category: str, type: str) -> SearchParamType:
@@ -102,11 +106,11 @@ class ParamSeq(Enum):
 class URLs(Enum):
     INDEX = "https://ncore.pro/index.php"
     LOGIN = "https://ncore.pro/login.php"
-    ACTIVITY = "https://ncore.pro/hitnrun.php"
+    ACTIVITY = "https://ncore.pro/hitnrun.php" + "?showall={show_all}"
     RECOMMENDED = "https://ncore.pro/recommended.php"
     TORRENTS_BASE = "https://ncore.pro/torrents.php"
     DOWNLOAD_PATTERN = (
-        TORRENTS_BASE + "?oldal={page}&tipus={t_type}&miszerint={sort}&hogyan={seq}&mire={pattern}&miben={where}"
+        TORRENTS_BASE + "?oldal={page}&tipus={t_type}&kivalasztott_tipus={filters}&miszerint={sort}&hogyan={seq}&mire={pattern}&miben={where}"
     )
     DETAIL_PATTERN = TORRENTS_BASE + "?action=details&id={id}"
     DOWNLOAD_LINK = "https://ncore.pro/torrents.php?action=download&id={id}&key={key}"

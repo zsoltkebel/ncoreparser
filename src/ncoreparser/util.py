@@ -1,5 +1,6 @@
 import datetime
 import functools
+import re
 import sys
 from typing import Any, Callable, Dict, Union
 
@@ -116,3 +117,19 @@ def check_login(func: Callable) -> Callable:
         return func(self, *args, **kwargs)
 
     return wrapper
+
+
+def parse_time_to_minutes(time_str: str) -> int:
+    """
+    Convert time string to integer minutes. E.g. "7ó 28p" -> 448
+    """
+    pattern = re.compile(r'(?:(?P<h>\d+)\s*ó)?\s*(?:(?P<p>\d+)\s*p)?')
+    
+    match = pattern.match(time_str.strip())
+    if not match:
+        return 0
+
+    hours = int(match.group('h') or 0)
+    minutes = int(match.group('p') or 0)
+
+    return (hours * 60) + minutes

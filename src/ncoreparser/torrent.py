@@ -1,47 +1,61 @@
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
 import os
-from typing import Any
 
-from ncoreparser.data import URLs
-from ncoreparser.util import Size
-
-
-def get_torrent_page_url(torrent_id: str) -> str:
-    return URLs.DETAIL_PATTERN.value.format(id=torrent_id)
+from ncoreparser.data import SearchParamType, URLs
+from ncoreparser.util import Size, parse_time_to_minutes
 
 
+@dataclass
 class Torrent:
-    def __init__(
-        self, id: str, title: str, key: str, size: Size, type: str, date: str, seed: str, leech: str, poster: str, **params: Any
-    ) -> None:
-        self._details = {
-            "id": id,
-            "title": title,
-            "key": key,
-            "size": size,
-            "type": type,
-            "date": date,
-            "seed": seed,
-            "leech": leech,
-            "download": URLs.DOWNLOAD_LINK.value.format(id=id, key=key),
-            "url": get_torrent_page_url(torrent_id=id),
-            "poster": poster,
-        }
-        self._details.update(params)
+    """
+    Represents each row of torrent data as listed on the search page.
+    """
+    id: str
+    title: str
+    key: str
+    size: Size
+    type: SearchParamType
+    date: datetime
+    seed: int
+    leech: int
+    poster: str
 
-    def __getitem__(self, key: str) -> Any:
-        return self._details[key]
+    @property
+    def download(self) -> str:
+        return URLs.DOWNLOAD_LINK.value.format(id=self.id, key=self.key)
 
-    def keys(self) -> list[str]:
-        return list(self._details.keys())
-
-    def __str__(self) -> str:
-        return f"<Torrent {self._details['id']}>"
-
-    def __repr__(self) -> str:
-        return f"<Torrent {self._details['id']}>"
+    @property
+    def url(self) -> str:
+        return URLs.DETAIL_PATTERN.value.format(id=self.id)
 
     def prepare_download(self, path: str) -> tuple[str, str]:
-        filename = str(self._details["title"]).replace(" ", "_") + ".torrent"
+        filename = str(self.title).replace(" ", "_") + ".torrent"
         filepath = os.path.join(path, filename)
-        url = str(self._details["download"])
+        url = str(self.download)
         return filepath, url
+
+
+@dataclass
+class TorrentActivity:
+    """
+    Represents each row of torrent data as listed on the activity page.
+    """
+    class Status(Enum):
+        SEEDING = "Seed"
+        STOPPED = "Stopped"
+
+    torrent_id: str
+    torrent_title: str
+    start: str
+    updated: str
+    status: Status
+    uploaded: Size
+    downloaded: Size
+    remaining: str
+    ratio: float
+
+    @property
+    def remaining_minutes(self) -> int:
+        return parse_time_to_minutes(self.remaining)

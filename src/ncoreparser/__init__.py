@@ -4,5 +4,5 @@ from .client_async import AsyncClient
 from .data import SearchParamType, SearchParamWhere, ParamSeq, ParamSort
 from .error import NcoreDownloadError, NcoreParserError, NcoreCredentialError, NcoreConnectionError
 from .util import Size
-from .torrent import Torrent, get_torrent_page_url
+from .torrent import Torrent
 from .types import SearchResult

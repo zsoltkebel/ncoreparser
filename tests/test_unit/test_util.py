@@ -1,6 +1,6 @@
 import pytest
 
-from ncoreparser.util import Size
+from ncoreparser.util import Size, parse_time_to_minutes
 
 
 class TestSize:
@@ -40,3 +40,14 @@ class TestSize:
         s = Size(size1)
         s += Size(size2)
         assert str(s) == expected
+
+
+@pytest.mark.parametrize("time_input, expected_minutes", [
+    ("7ó 28p", 448),
+    ("10ó", 600),
+    ("55p", 55),
+    ("", 0),
+    ("  2ó  10p  ", 130),
+])
+def test_parse_time_to_minutes(time_input, expected_minutes):
+    assert parse_time_to_minutes(time_input) == expected_minutes

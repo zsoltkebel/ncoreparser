@@ -6,7 +6,7 @@ import httpx
 from ncoreparser.data import ParamSeq, ParamSort, SearchParamType, SearchParamWhere, URLs
 from ncoreparser.error import NcoreConnectionError, NcoreCredentialError, NcoreDownloadError
 from ncoreparser.parser import ActivityParser, RecommendedParser, RssParser, TorrenDetailParser, TorrentsPageParser
-from ncoreparser.torrent import Torrent
+from ncoreparser.torrent import Torrent, TorrentActivity
 from ncoreparser.types import SearchResult
 from ncoreparser.util import Size, check_login, extract_cookies_from_client, set_cookies_to_client
 
@@ -69,6 +69,7 @@ class Client:
         self,
         pattern: str,
         type: SearchParamType = SearchParamType.ALL_OWN,
+        filters: set[SearchParamType] = set(),
         where: SearchParamWhere = SearchParamWhere.NAME,
         sort_by: ParamSort = ParamSort.UPLOAD,
         sort_order: ParamSeq = ParamSeq.DECREASING,
@@ -77,6 +78,7 @@ class Client:
         url = URLs.DOWNLOAD_PATTERN.value.format(
             page=page,
             t_type=type.value,
+            filters=','.join(f.value for f in filters),
             sort=sort_by.value,
             seq=sort_order.value,
             pattern=pattern,
@@ -86,7 +88,7 @@ class Client:
             request = self._client.get(url)
         except Exception as e:
             raise NcoreConnectionError(f"Error while searching torrents. {e}") from e
-        torrents = [Torrent(**params) for params in self._page_parser.get_items(request.text)]
+        torrents = self._page_parser.get_items(request.text)
         num_of_pages = self._page_parser.get_num_of_pages(request.text)
         return SearchResult(torrents=torrents, num_of_pages=num_of_pages)
 
@@ -113,29 +115,14 @@ class Client:
             yield self.get_torrent(id)
 
     @check_login
-    def get_by_activity(self) -> list[Torrent]:
+    def get_by_activity(self, show_all: bool = False) -> list[TorrentActivity]:
         try:
-            content = self._client.get(URLs.ACTIVITY.value)
+            url = URLs.ACTIVITY.value.format(show_all=str(show_all).lower())
+            content = self._client.get(url)
         except Exception as e:
             raise NcoreConnectionError(f"Error while get activity. Url: '{URLs.ACTIVITY.value}'. {e}") from e
 
-        torrents = []
-        for id, start_t, updated_t, status, uploaded, downloaded, remaining_t, rate in self._activity_parser.get_params(
-            content.text
-        ):
-            torrents.append(
-                self.get_torrent(
-                    id,
-                    start=start_t,
-                    updated=updated_t,
-                    status=status,
-                    uploaded=Size(uploaded),
-                    downloaded=Size(downloaded),
-                    remaining=remaining_t,
-                    rate=float(rate),
-                )
-            )
-        return torrents
+        return self._activity_parser.parse(content.text)
 
     @check_login
     def get_recommended(self, type: Union[SearchParamType, None] = None) -> Generator[Torrent, None, None]:

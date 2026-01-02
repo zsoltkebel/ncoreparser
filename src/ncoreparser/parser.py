@@ -5,6 +5,7 @@ from typing import Any, Generator, Union
 
 from ncoreparser.data import SearchParamType, get_detailed_param
 from ncoreparser.error import NcoreParserError
+from ncoreparser.torrent import Torrent, TorrentActivity
 from ncoreparser.util import Size, parse_datetime
 
 
@@ -33,7 +34,7 @@ class TorrentsPageParser:
             return find.group("key")
         raise NcoreParserError(f"Error while read user key with pattern: {key_pattern}")
 
-    def get_items(self, data: str) -> Generator[dict, None, None]:
+    def get_items(self, data: str) -> Generator[Torrent, None, None]:
         types = self.type_pattern.findall(data)
         ids_and_names = self.id_and_name_pattern.findall(data)
         ids_and_posters = self.id_and_poster_pattern.findall(data)
@@ -55,17 +56,17 @@ class TorrentsPageParser:
             return
 
         for i, id in enumerate(ids):
-            yield {
-                "id": id,
-                "title": names[i],
-                "key": key,
-                "date": parse_datetime(dates[i], times[i]),
-                "size": Size(sizes[i]),
-                "type": SearchParamType(types[i]),
-                "seed": seed[i],
-                "leech": leech[i],
-                "poster": posters.get(id),
-            }
+            yield Torrent(
+                id=id,
+                title=names[i],
+                key=key,
+                date=parse_datetime(dates[i], times[i]),
+                size=Size(sizes[i]),
+                type=SearchParamType(types[i]),
+                seed=int(seed[i]),
+                leech=int(leech[i]),
+                poster=posters.get(id)
+            )
 
     def get_num_of_pages(self, data: str) -> int:
         current_num_of_items_found = self.current_page_pattern.search(data)
@@ -151,22 +152,33 @@ class RssParser:
 
 class ActivityParser:
     def __init__(self) -> None:
-        self.patterns = [
-            re.compile(r'onclick="torrent\((.*?)\);'),
-            re.compile(r'<div class="hnr_tstart">(.*?)<\/div>'),
-            re.compile(r'<div class="hnr_tlastactive">(.*?)<\/div>'),
-            re.compile(r'<div class="hnr_tseed"><span class=".*?">(.*?)<\/span><\/div>'),
-            re.compile(r'<div class="hnr_tup">(.*?)<\/div>'),
-            re.compile(r'<div class="hnr_tdown">(.*?)<\/div>'),
-            re.compile(r'<div class="hnr_ttimespent"><span class=".*?">(.*?)<\/span><\/div>'),
-            re.compile(r'<div class="hnr_tratio"><span class=".*?">(.*?)<\/span><\/div>'),
-        ]
+        self.patterns = {
+            "torrent_id": re.compile(r'onclick="torrent\((.*?)\);'),
+            "torrent_title": re.compile(r'onclick="torrent\(.*?\);.*?" title="(.*?)"'),
+            "start": re.compile(r'<div class="hnr_tstart">(.*?)<\/div>'),
+            "updated": re.compile(r'<div class="hnr_tlastactive">(.*?)<\/div>'),
+            "status": re.compile(r'<div class="hnr_tseed"><span class=".*?">(.*?)<\/span><\/div>'),
+            "uploaded": re.compile(r'<div class="hnr_tup">(.*?)<\/div>'),
+            "downloaded": re.compile(r'<div class="hnr_tdown">(.*?)<\/div>'),
+            "remaining": re.compile(r'<div class="hnr_ttimespent"><span class=".*?">(.*?)<\/span><\/div>'),
+            "ratio": re.compile(r'<div class="hnr_tratio"><span class=".*?">(.*?)<\/span><\/div>'),
+        }
 
-    def get_params(self, data: str) -> tuple[tuple[Any, ...], ...]:
-        out = []
-        for parser in self.patterns:
-            out.append(parser.findall(data))
-        return tuple(zip(*out))
+    def get_params(self, data: str) -> list[dict[str, Any]]:
+        all_matches = [p.findall(data) for p in self.patterns.values()]
+        return [dict(zip(self.patterns, row)) for row in zip(*all_matches)]
+
+    def parse(self, data: str) -> list[TorrentActivity]:
+        activities = []
+        for params in self.get_params(data):
+            params["status"] = TorrentActivity.Status(params["status"])
+            params["uploaded"] = Size(params["uploaded"])
+            params["downloaded"] = Size(params["downloaded"])
+            params["ratio"] = float(params["ratio"])
+
+            activities.append(TorrentActivity(**params))
+
+        return activities
 
 
 class RecommendedParser:
